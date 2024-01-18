@@ -8,7 +8,7 @@
 #include <std_msgs/msg/int32.h>
 #include <sensor_msgs/msg/imu.h>
 #include <rmw_microros/rmw_microros.h>
-
+#include <geometry_msgs/msg/quaternion.h>
 
 #include "pico/stdlib.h"
 #include "pico_uart_transports.h"
@@ -21,7 +21,6 @@ std_msgs__msg__Int32 msg;
 sensor_msgs__msg__Imu imu_msg;
 rcl_clock_t clock;
 IMU_EN_SENSOR_TYPE enMotionSensorType;
-
 
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
@@ -40,6 +39,11 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     IMU_ST_SENSOR_DATA stMagnRawData;
     imuDataGet( &stAngles, &stGyroRawData, &stAccelRawData, &stMagnRawData);
 
+    // convert stAngles to degree values because icm20948.c multiplies it with 57.3 we have to normalize it again 
+    stAngles.fYaw = stAngles.fYaw/57.3;
+    stAngles.fPitch = stAngles.fPitch/57.3;
+    stAngles.fRoll = stAngles.fRoll/57.3;
+    
     // convert imu data
     double cosYaw = cos(stAngles.fYaw * 0.5);
     double sinYaw = sin(stAngles.fYaw * 0.5);
@@ -52,8 +56,18 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     double qz = cosRoll * cosPitch * sinYaw - sinRoll * sinPitch * cosYaw;
     double qw = cosRoll * cosPitch * cosYaw + sinRoll * sinPitch * sinYaw;
 
+    //normalize quaternion to make sure it only represents an rotation
+    double magnitude = sqrt(qx*qx + qy*qy + qz*qz + qw*qw);
+    qx = qx / magnitude;
+    qy = qy / magnitude;
+    qz = qz / magnitude;
+    qw = qw / magnitude;
+
     //set imu data
-        imu_msg.angular_velocity.x = stGyroRawData.s16X ;
+    rosidl_runtime_c__String__assign(&imu_msg.header.frame_id, "base_link");
+
+    //Check: This seems ok. is not visualized in rviz
+    imu_msg.angular_velocity.x = stGyroRawData.s16X ;
     imu_msg.angular_velocity.y = stGyroRawData.s16Y ;
     imu_msg.angular_velocity.z = stGyroRawData.s16Z ;
     imu_msg.angular_velocity_covariance[0] = 0.02;
@@ -65,7 +79,7 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     imu_msg.angular_velocity_covariance[6] = 0;
     imu_msg.angular_velocity_covariance[7] = 0;
     imu_msg.angular_velocity_covariance[8] = 0.02;
-
+    
     imu_msg.linear_acceleration.x =  stAccelRawData.s16X ;
     imu_msg.linear_acceleration.y = stAccelRawData.s16Y ;
     imu_msg.linear_acceleration.z = stAccelRawData.s16Z ;
@@ -78,7 +92,6 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     imu_msg.linear_acceleration_covariance[6] = 0;
     imu_msg.linear_acceleration_covariance[7] = 0;
     imu_msg.linear_acceleration_covariance[8] = 0.04;
-
 
     imu_msg.orientation.x = qx;
     imu_msg.orientation.y = qy;
@@ -146,7 +159,7 @@ int main()
     rclc_timer_init_default(
         &timer,
         &support,
-        RCL_MS_TO_NS(1000),
+        RCL_MS_TO_NS(100),
         timer_callback);
 
     rclc_executor_init(&executor, &support.context, 1, &allocator);
@@ -164,3 +177,4 @@ int main()
     }
     return 0;
 }
+
