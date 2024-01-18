@@ -1,7 +1,7 @@
 ![banner](.images/banner-dark-theme.png#gh-dark-mode-only)
 ![banner](.images/banner-light-theme.png#gh-light-mode-only)
 
-# micro-ROS module for Raspberry Pi Pico SDK
+# micro-ROS module for Raspberry Pi Pico Integration with Waveshare_19358 10 DoF IMU Sensor
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
